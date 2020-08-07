@@ -1,8 +1,8 @@
 from random import randint
 
-from shapely.geometry import box, Point
+from shapely.geometry import box
 
-from src.world.Graphics import Graphics
+from src.world.PyGameGraphics import PyGameGraphics
 from src.world.SPTree import SPTree
 from src.world.VectorLine import VectorLine
 
@@ -37,18 +37,12 @@ class World:
 
 
 if __name__ == "__main__":
-    length = 200
-    height = 100
+    width = 768
+    height = 768
 
-    b_box = box(0, 0, length, height)
-    world = World(b_box, 5)
-    graphics = Graphics()
-
+    b_box = box(0, 0, width, height)
+    world = World(b_box, 10)
     sptree = SPTree(world.lines, b_box)
 
-    camera_location = Point((75, 75))
-    Graphics.draw_sptree(sptree, b_box, camera_location)
-
-    # while True:
-    #     test = SPTree(world.lines, b_box)
-    #     print("Test passed")
+    display = PyGameGraphics(sptree)
+    display.run()
