@@ -1,22 +1,25 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 from src.world.SPTree import SPTree, Perspective
 
 
 class Graphics:
 
+    def __init__(self):
+        plt.gca().set_prop_cycle(plt.cycler('color', plt.cm.get_cmap('gist_gray')(np.linspace(0, 1))))
+        plt.gca().set_aspect('equal', adjustable='box')
+
     @staticmethod
     def draw(lines, bounding_box):
         bx, by = bounding_box.exterior.xy
         plt.plot(bx, by)
-
         for line in lines:
             lx, ly = Graphics.get_plottable_line(line)
             plt.plot(lx, ly)
             nx, ny = Graphics.get_normal_plot(line)
             plt.plot(nx, ny)
 
-        plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
 
     @staticmethod
@@ -24,6 +27,9 @@ class Graphics:
         bx, by = bounding_box.exterior.xy
         plt.plot(bx, by)
         Graphics.__draw_sptree_helper(sptree.root, bounding_box, camera_location)
+        # Redraw root line
+        lx, ly = Graphics.get_plottable_line(sptree.root.lines[0])
+        plt.plot(lx, ly, color="MAGENTA")
         cx, cy = camera_location.xy
         plt.plot([cx], [cy], marker='o', markersize=3, color="red")
         plt.show()
@@ -33,6 +39,8 @@ class Graphics:
         for line in node.lines:
             lx, ly = Graphics.get_plottable_line(line)
             plt.plot(lx, ly)
+            nx, ny = Graphics.get_normal_plot(line)
+            plt.plot(nx, ny)
 
     @staticmethod
     def __draw_sptree_helper(cur_node, bounding_box, camera_location):
@@ -53,8 +61,8 @@ class Graphics:
             Graphics.__draw_sptree_helper(cur_node.right, bounding_box, camera_location)
 
         else:
-            Graphics.__draw_sptree_helper(cur_node.right, bounding_box, camera_location)
             Graphics.__draw_sptree_helper(cur_node.left, bounding_box, camera_location)
+            Graphics.__draw_sptree_helper(cur_node.right, bounding_box, camera_location)
 
     @staticmethod
     def get_plottable_line(line):
