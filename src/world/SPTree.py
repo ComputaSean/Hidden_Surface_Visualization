@@ -1,3 +1,4 @@
+from enum import Enum
 from random import shuffle
 
 from shapely.geometry import box, LineString, Point
@@ -5,52 +6,74 @@ from shapely.ops import split
 
 from src.world.VectorLine import VectorLine
 
+error = 1e-13
+
 
 class SPTree:
 
-    def __init__(self, lines, minx, miny, maxx, maxy):
+    def __init__(self, lines, bounding_box):
         shuffle(lines)
-        bounding_box = box(minx, miny, maxx, maxy)
-        self.root = SPTree.construct(lines, bounding_box)
+        self.root = SPTree.__construct(lines, bounding_box)
+        self.bounding_box = bounding_box
 
     @staticmethod
-    def construct(lines, bounding_box):
+    def __construct(lines, bounding_box):
         if len(lines) == 0:
             return None
 
-        error = 1e-13
-
-        chosen_line = lines[0]
-        coincident_lines = [chosen_line]
+        splitting_line = lines[0]
+        coincident_lines = [splitting_line]
         front = []
-        behind = []
+        back = []
 
-        splitting_line = SPTree.get_splitting_line(chosen_line, bounding_box)
+        splitting_plane = SPTree.__get_splitting_plane(splitting_line, bounding_box)
+
         for i in range(1, len(lines)):
-            cur_line = lines[i]
-            start = Point(cur_line.coords[0])
-            end = Point(cur_line.coords[1])
-            # Coincident Line
-            if splitting_line.distance(start) < error and splitting_line.distance(end) < error:
-                coincident_lines.append(cur_line)
-            # Intersected Line
-            elif splitting_line.crosses(cur_line):
-                first_half, second_half = split(cur_line, splitting_line)
-                first_half = VectorLine(tuple(first_half.coords))
-                second_half = VectorLine(tuple(second_half.coords))
-                SPTree.classify_line(first_half, front, behind)
-                SPTree.classify_line(second_half, front, behind)
-            # Line enclosed within one of the created planes
+            line = lines[i]
+            line_start = Point(line.coords[0])
+            line_end = Point(line.coords[1])
+            # Coincident line to splitting line
+            if splitting_plane.distance(line_start) < error and splitting_plane.distance(line_end) < error:
+                coincident_lines.append(line)
+            # Splitting line crosses line
+            elif splitting_plane.crosses(line):
+                first_half, second_half = split(line, splitting_plane)
+                first_half = VectorLine(first_half.coords, line.normal_dir)
+                second_half = VectorLine(second_half.coords, line.normal_dir)
+                SPTree.__determine_side(first_half, splitting_line, splitting_plane, front, back)
+                SPTree.__determine_side(second_half, splitting_line, splitting_plane, front, back)
+            # Line enclosed within one of the planes created by the splitting plane
             else:
-                SPTree.classify_line(cur_line, front, behind)
+                SPTree.__determine_side(line, splitting_line, splitting_plane, front, back)
 
-        front_node = SPTree.construct(front, bounding_box)
-        behind_node = SPTree.construct(behind, bounding_box)
+        front_node = SPTree.__construct(front, bounding_box)
+        behind_node = SPTree.__construct(back, bounding_box)
         cur_node = Node(coincident_lines, front_node, behind_node)
+
         return cur_node
 
     @staticmethod
-    def get_splitting_line(line, polygon):
+    def __determine_side(line, splitting_line, splitting_plane, front, behind):
+        """
+        Determines whether line is in front or behind splitting line.
+
+        :param line:
+        :param splitting_line:
+        :param splitting_plane:
+        :param front:
+        :param behind:
+        :return:
+        """
+        normal_end_point = Point(splitting_line.normal.coords[1])
+        line_center_point = line.centroid
+        connecting_line = LineString([line_center_point, normal_end_point])
+        if connecting_line.crosses(splitting_plane):
+            behind.append(line)
+        else:
+            front.append(line)
+
+    @staticmethod
+    def __get_splitting_plane(line, polygon):
         """
         Credit to https://stackoverflow.com/a/62413539
         :param line:
@@ -74,70 +97,42 @@ class SPTree:
             x0 = (miny - b) / m
             x1 = (maxy - b) / m
             points_on_boundary_lines = [Point(minx, y0), Point(maxx, y1), Point(x0, miny), Point(x1, maxy)]
-            points_sorted_by_distance = sorted(points_on_boundary_lines, key=bounding_box.distance)
-            extended_line = LineString(points_sorted_by_distance[:2])
+            unique_points_on_boundary_lines = []
 
-        # assert (extended_line.distance(Point(line.coords[0])) < 1e-13)
-        # assert (extended_line.distance(Point(line.coords[1])) < 1e-13)
+            for p in points_on_boundary_lines:
+                if p not in unique_points_on_boundary_lines:
+                    unique_points_on_boundary_lines.append(p)
+
+            points_sorted_by_distance = sorted(unique_points_on_boundary_lines, key=bounding_box.distance)
+            extended_line = LineString(points_sorted_by_distance[:2])
 
         return extended_line
 
     @staticmethod
-    def cut_line_at_points(line, points):
-        # First coords of line
-        coords = list(line.coords)
-
-        # Keep list coords where to cut (cuts = 1)
-        cuts = [0] * len(coords)
-        cuts[0] = 1
-        cuts[-1] = 1
-
-        # Add the coords from the points
-        coords += [list(p.coords)[0] for p in points]
-        cuts += [1] * len(points)
-
-        # Calculate the distance along the line for each point
-        dists = [line.project(Point(p)) for p in coords]
-
-        # sort the coords/cuts based on the distances
-        # see http://stackoverflow.com/questions/6618515/sorting-list-based-on-values-from-another-list
-        coords = [p for (d, p) in sorted(zip(dists, coords))]
-        cuts = [p for (d, p) in sorted(zip(dists, cuts))]
-
-        # generate the Lines
-        # lines = [LineString([coords[i], coords[i+1]]) for i in range(len(coords)-1)]
-        lines = []
-
-        for i in range(len(coords) - 1):
-            if cuts[i] == 1:
-                # find next element in cuts == 1 starting from index i + 1
-                j = cuts.index(1, i + 1)
-                lines.append(LineString(coords[i:j + 1]))
-
-        return lines
-
-    @staticmethod
-    def classify_line(line, front, behind):
-        nx, ny = line.get_normal_plot()
-        end = Point([(nx[1], ny[1])])
-        start = line.centroid
-        connecting_line = LineString([start, end])
-        # If crossed, then behind
-        if connecting_line.crosses(line):  # Intersects?
-            behind.append(line)
-        # Else then in front
+    def classify_perspective(point, splitting_line, bounding_box):
+        normal_end_point = Point(splitting_line.normal.coords[1])
+        connecting_line = LineString([point, normal_end_point])
+        splitting_plane = SPTree.__get_splitting_plane(splitting_line, bounding_box)
+        if splitting_plane.distance(point) < error:
+            return Perspective.ON
+        elif connecting_line.crosses(splitting_plane):
+            return Perspective.BACK
         else:
-            front.append(line)
+            return Perspective.FRONT
 
 
 class Node:
 
     def __init__(self, lines, left=None, right=None):
-        self.line = lines
-        self.left = left
-        self.right = right
+        self.lines = lines
+        self.left = left  # front
+        self.right = right  # back
+
+    def is_leaf(self):
+        return self.left is None and self.right is None
 
 
-if __name__ == "__main__":
-    my_lines = [VectorLine([(1, 2), (3, 4)])]
-    SPTree(my_lines, 0, 0, 100, 100)
+class Perspective(Enum):
+    ON = 1
+    FRONT = 2
+    BACK = 3
