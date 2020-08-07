@@ -2,9 +2,9 @@ from random import randint
 
 from shapely.geometry import box
 
-from src.world.PyGameGraphics import PyGameGraphics
-from src.world.SPTree import SPTree
-from src.world.VectorLine import VectorLine
+from src.Graphics.PyGameGraphics import PyGameGraphics
+from src.SPTree.SPTree import SPTree
+from src.VectorLine.VectorLine import VectorLine
 
 
 class World:

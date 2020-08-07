@@ -4,7 +4,7 @@ from enum import Enum
 from shapely.geometry import box, LineString, Point
 from shapely.ops import split
 
-from src.world.VectorLine import VectorLine
+from src.VectorLine.VectorLine import VectorLine
 
 error = 1e-13  # Floating point precision
 
