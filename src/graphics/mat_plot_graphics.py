@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.SPTree.SPTree import SPTree, Perspective
+from src.sptree.sp_tree import SPTree, Perspective
 
 
 class MatPlotGraphics:

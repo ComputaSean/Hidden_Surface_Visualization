@@ -5,7 +5,7 @@ import pygame
 from pygame.locals import *
 from shapely.geometry import Point
 
-from src.SPTree.SPTree import SPTree, Perspective
+from src.sptree.sp_tree import SPTree, Perspective
 
 
 class PyGameGraphics:
