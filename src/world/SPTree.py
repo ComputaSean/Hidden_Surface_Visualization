@@ -1,18 +1,17 @@
+import random
 from enum import Enum
-from random import shuffle
 
 from shapely.geometry import box, LineString, Point
 from shapely.ops import split
 
 from src.world.VectorLine import VectorLine
 
-error = 1e-13
+error = 1e-13  # Floating point precision
 
 
 class SPTree:
 
     def __init__(self, lines, bounding_box):
-        shuffle(lines)
         self.root = SPTree.__construct(lines, bounding_box)
         self.bounding_box = bounding_box
 
@@ -21,21 +20,23 @@ class SPTree:
         if len(lines) == 0:
             return None
 
-        splitting_line = lines[0]
+        splitting_line = SPTree.__pick_splitting_line(lines, bounding_box)
         coincident_lines = [splitting_line]
         front = []
         back = []
 
         splitting_plane = SPTree.__get_splitting_plane(splitting_line, bounding_box)
 
-        for i in range(1, len(lines)):
+        for i in range(len(lines)):
+            if lines[i] == splitting_line:
+                continue
             line = lines[i]
             line_start = Point(line.coords[0])
             line_end = Point(line.coords[1])
-            # Coincident line to splitting line
+            # Coincident line to splitting plane
             if splitting_plane.distance(line_start) < error and splitting_plane.distance(line_end) < error:
                 coincident_lines.append(line)
-            # Splitting line crosses line
+            # Splitting plane crosses line
             elif splitting_plane.crosses(line):
                 first_half, second_half = split(line, splitting_plane)
                 first_half = VectorLine(first_half.coords, line.normal_dir)
@@ -47,10 +48,45 @@ class SPTree:
                 SPTree.__determine_side(line, splitting_line, splitting_plane, front, back)
 
         front_node = SPTree.__construct(front, bounding_box)
-        behind_node = SPTree.__construct(back, bounding_box)
-        cur_node = Node(coincident_lines, front_node, behind_node)
+        back_node = SPTree.__construct(back, bounding_box)
+        cur_node = Node(coincident_lines, front_node, back_node)
 
         return cur_node
+
+    @staticmethod
+    def __pick_splitting_line(lines, bounding_box):
+        """
+        Randomly selects a sampling of lines and returns the one that results in the least number of lines split
+        from its splitting plane.
+
+        :param lines:
+        :param bounding_box:
+        :return:
+        """
+        line_sample = random.sample(lines, 5) if len(lines) >= 5 else lines
+        sample_num_pieces = []
+        for i in range(len(line_sample)):
+            num_pieces = 0
+            splitting_plane = SPTree.__get_splitting_plane(line_sample[i], bounding_box)
+            for j in range(len(line_sample)):
+                if j == i:
+                    continue
+                line = lines[j]
+                line_start = Point(line.coords[0])
+                line_end = Point(line.coords[1])
+                # Coincident line to splitting plane: no resulting pieces
+                if splitting_plane.distance(line_start) < error and splitting_plane.distance(line_end) < error:
+                    continue
+                # Splitting plane crosses line: cuts line in half
+                elif splitting_plane.crosses(line):
+                    num_pieces += 2
+                # Line enclosed within one of the planes created by the splitting plane: one piece
+                else:
+                    num_pieces += 1
+            sample_num_pieces.append(num_pieces)
+
+        min_index = min((val, index) for (index, val) in enumerate(sample_num_pieces))[1]
+        return line_sample[min_index]
 
     @staticmethod
     def __determine_side(line, splitting_line, splitting_plane, front, behind):
