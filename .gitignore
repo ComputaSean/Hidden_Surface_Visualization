@@ -93,4 +93,4 @@ fabric.properties
 # End of https://www.gitignore.io/api/clion
 
 .idea/
-src/world/__pycache__
+src/**/__pycache__

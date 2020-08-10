@@ -12,7 +12,7 @@ class PyGameGraphics:
 
     def __init__(self, sptree):
         pygame.init()
-        self.fps = 60
+        self.fps = 120
         self.fpsClock = pygame.time.Clock()
         minx, miny, maxx, maxy = sptree.bounding_box.bounds  # sptree bounding box will be the screen's dimension
         self.width = maxx
