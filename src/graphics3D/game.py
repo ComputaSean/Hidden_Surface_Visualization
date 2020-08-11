@@ -5,16 +5,17 @@ from random import randint
 import pygame
 from pygame.locals import *
 
-from graphics3D.camera import Camera
+from graphics3D.camera.freecamera import FreeCamera
+from graphics3D.camera.groundcamera import GroundCamera
 from graphics3D.wireframe import Wireframe
 
 
 class Game:
     key_to_motion = {
-        pygame.K_w: (lambda x: x.camera.dolly_forward_xz_aligned()),
-        pygame.K_s: (lambda x: x.camera.dolly_backward_xz_aligned()),
-        pygame.K_a: (lambda x: x.camera.truck_left_xz_aligned()),
-        pygame.K_d: (lambda x: x.camera.truck_right_xz_aligned()),
+        pygame.K_w: (lambda x: x.camera.dolly_forward()),
+        pygame.K_s: (lambda x: x.camera.dolly_backward()),
+        pygame.K_a: (lambda x: x.camera.truck_left()),
+        pygame.K_d: (lambda x: x.camera.truck_right()),
         pygame.K_q: (lambda x: x.camera.pedestal_down()),
         pygame.K_e: (lambda x: x.camera.pedestal_up()),
         pygame.K_HOME: (lambda x: x.camera.tilt_up()),
@@ -34,7 +35,7 @@ class Game:
         self.screen_width = 1024
         self.screen_height = 1024
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        self.camera = Camera()
+        self.camera = GroundCamera()
         self.wireframes = []
 
     def run(self):

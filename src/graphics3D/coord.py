@@ -8,6 +8,25 @@ class Coord:
     def __init__(self, basis):
         self.basis = basis
 
+    def rotate_about_arb_axis(self, axis, angle):
+        normalized = axis / np.linalg.norm(axis)
+        ux = normalized[0]
+        uy = normalized[1]
+        uz = normalized[2]
+        c = cos(angle)
+        s = sin(angle)
+        rotation_matrix = np.array(
+            [[c + (ux ** 2) * (1 - c), ux * uy * (1 - c) - uz * s, ux * uz * (1 - c) + uy * s, 0],
+             [uy * ux * (1 - c) + uz * s, c + (uy ** 2) * (1 - c), uy * uz * (1 - c) - ux * s, 0],
+             [uz * ux * (1 - c) - uy * s, uz * uy * (1 - c) + ux * s, c + (uz ** 2) * (1 - c), 0],
+             [0, 0, 0, 1]]).T
+        # np.array([[c + (ux ** 2) * (1 - c), uy * ux * (1 - c) + uz * s, uz * ux * (1 - c) - uy * s, 0],
+        #           [ux * uy * (1 - c) - ux * s, c + (uy ** 2) * (1 - c), uz * uy * (1 - c) + ux * s, 0],
+        #           [ux * uz * (1 - c) + uy * s, uy * uz * (1 - c) - ux * s, c + (uz ** 2) * (1 - c), 0],
+        #           [0, 0, 0, 1]])
+
+        self.basis = np.matmul(self.basis, rotation_matrix)
+
     def rotate_about_x_axis(self, angle):
         self.basis = np.matmul(self.basis, Coord.__get_x_rotation_matrix(angle))
 
