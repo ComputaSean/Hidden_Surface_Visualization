@@ -5,7 +5,7 @@ import pygame
 from pygame.locals import *
 from shapely.geometry import Point
 
-from src.sptree.sp_tree import SPTree, Perspective
+from src.sptree.sp_tree import Perspective
 
 
 class PyGameGraphics:
@@ -142,12 +142,12 @@ class PyGameGraphics:
         elif cur_node.is_leaf():
             render_order.extend(PyGameGraphics.__get_lines_at_node(cur_node))
 
-        elif SPTree.classify_perspective(camera_location, cur_node.lines[0], bounding_box) == Perspective.FRONT:
+        elif Perspective.classify(camera_location, cur_node.lines[0], bounding_box) == Perspective.FRONT:
             render_order.extend(PyGameGraphics.__get_render_order_helper(cur_node.right, bounding_box, camera_location))
             render_order.extend(PyGameGraphics.__get_lines_at_node(cur_node))
             render_order.extend(PyGameGraphics.__get_render_order_helper(cur_node.left, bounding_box, camera_location))
 
-        elif SPTree.classify_perspective(camera_location, cur_node.lines[0], bounding_box) == Perspective.BACK:
+        elif Perspective.classify(camera_location, cur_node.lines[0], bounding_box) == Perspective.BACK:
             render_order.extend(PyGameGraphics.__get_render_order_helper(cur_node.left, bounding_box, camera_location))
             render_order.extend(PyGameGraphics.__get_lines_at_node(cur_node))
             render_order.extend(PyGameGraphics.__get_render_order_helper(cur_node.right, bounding_box, camera_location))

@@ -1,7 +1,7 @@
 import random
 from enum import Enum
 
-from shapely.geometry import box, LineString, Point
+from shapely.geometry import box, LineString, Point, LinearRing
 from shapely.ops import split
 
 from src.vectorline.vector_line import VectorLine
@@ -25,7 +25,7 @@ class SPTree:
         front = []
         back = []
 
-        splitting_plane = SPTree.__get_splitting_plane(splitting_line, bounding_box)
+        splitting_plane = get_splitting_plane(splitting_line, bounding_box)
 
         for i in range(len(lines)):
             if lines[i] == splitting_line:
@@ -41,11 +41,11 @@ class SPTree:
                 first_half, second_half = split(line, splitting_plane)
                 first_half = VectorLine(first_half.coords, line.normal_dir)
                 second_half = VectorLine(second_half.coords, line.normal_dir)
-                SPTree.__determine_side(first_half, splitting_line, splitting_plane, front, back)
-                SPTree.__determine_side(second_half, splitting_line, splitting_plane, front, back)
+                SPTree.__categorize_line(first_half, splitting_line, front, back)
+                SPTree.__categorize_line(second_half, splitting_line, front, back)
             # Line enclosed within one of the planes created by the splitting plane
             else:
-                SPTree.__determine_side(line, splitting_line, splitting_plane, front, back)
+                SPTree.__categorize_line(line, splitting_line, front, back)
 
         front_node = SPTree.__construct(front, bounding_box)
         back_node = SPTree.__construct(back, bounding_box)
@@ -67,7 +67,7 @@ class SPTree:
         sample_num_pieces = []
         for i in range(len(line_sample)):
             num_pieces = 0
-            splitting_plane = SPTree.__get_splitting_plane(line_sample[i], bounding_box)
+            splitting_plane = get_splitting_plane(line_sample[i], bounding_box)
             for j in range(len(line_sample)):
                 if j == i:
                     continue
@@ -89,72 +89,11 @@ class SPTree:
         return line_sample[min_index]
 
     @staticmethod
-    def __determine_side(line, splitting_line, splitting_plane, front, behind):
-        """
-        Determines whether line is in front or behind splitting line.
-
-        :param line:
-        :param splitting_line:
-        :param splitting_plane:
-        :param front:
-        :param behind:
-        :return:
-        """
-        normal_end_point = Point(splitting_line.normal.coords[1])
-        line_center_point = line.centroid
-        connecting_line = LineString([line_center_point, normal_end_point])
-        if connecting_line.crosses(splitting_plane):
-            behind.append(line)
-        else:
+    def __categorize_line(line, splitting_line, front, behind):
+        if is_point_in_front_of_line(splitting_line, line.centroid):
             front.append(line)
-
-    @staticmethod
-    def __get_splitting_plane(line, polygon):
-        """
-        Credit to https://stackoverflow.com/a/62413539
-        :param line:
-        :param polygon:
-        :return:
-        """
-        minx, miny, maxx, maxy = polygon.bounds
-
-        bounding_box = box(minx, miny, maxx, maxy)
-        p1, p2 = line.boundary
-        if p1.x == p2.x:  # vertical line
-            extended_line = LineString([(p1.x, miny), (p1.x, maxy)])
-        elif p1.y == p2.y:  # horizontal line
-            extended_line = LineString([(minx, p1.y), (maxx, p1.y)])
         else:
-            # linear equation: y = mx + b
-            m = (p2.y - p1.y) / (p2.x - p1.x)  # Slope
-            b = p1.y - m * p1.x  # y-intercept
-            y0 = m * minx + b
-            y1 = m * maxx + b
-            x0 = (miny - b) / m
-            x1 = (maxy - b) / m
-            points_on_boundary_lines = [Point(minx, y0), Point(maxx, y1), Point(x0, miny), Point(x1, maxy)]
-            unique_points_on_boundary_lines = []
-
-            for p in points_on_boundary_lines:
-                if p not in unique_points_on_boundary_lines:
-                    unique_points_on_boundary_lines.append(p)
-
-            points_sorted_by_distance = sorted(unique_points_on_boundary_lines, key=bounding_box.distance)
-            extended_line = LineString(points_sorted_by_distance[:2])
-
-        return extended_line
-
-    @staticmethod
-    def classify_perspective(point, splitting_line, bounding_box):
-        normal_end_point = Point(splitting_line.normal.coords[1])
-        connecting_line = LineString([point, normal_end_point])
-        splitting_plane = SPTree.__get_splitting_plane(splitting_line, bounding_box)
-        if splitting_plane.distance(point) < error:
-            return Perspective.ON
-        elif connecting_line.crosses(splitting_plane):
-            return Perspective.BACK
-        else:
-            return Perspective.FRONT
+            behind.append(line)
 
 
 class Node:
@@ -172,3 +111,68 @@ class Perspective(Enum):
     ON = 1
     FRONT = 2
     BACK = 3
+
+    @staticmethod
+    def classify(point, splitting_line, bounding_box):
+        splitting_plane = get_splitting_plane(splitting_line, bounding_box)
+        if splitting_plane.distance(point) < error:
+            return Perspective.ON
+        if is_point_in_front_of_line(splitting_line, point):
+            return Perspective.FRONT
+        else:
+            return Perspective.BACK
+
+
+def is_point_in_front_of_line(line, point):
+    """
+    Determines whether the point is in front or behind the line.
+
+    https://stackoverflow.com/questions/50393718/determine-the-left-and-right-side-of-a-split-shapely-geometry
+    :param line:
+    :param point:
+    :return:
+    """
+    # If both linear rings result in the same winding order, then the point must be on the same side as the normal and
+    # hence in the front of the line
+    normal_end_point = Point(line.normal.coords[1])
+    normal_on_left = LinearRing([line.coords[0], line.coords[1], normal_end_point]).is_ccw
+    line_on_left = LinearRing([line.coords[0], line.coords[1], point]).is_ccw
+    return normal_on_left == line_on_left
+
+
+def get_splitting_plane(line, polygon):
+    """
+    Extends a line inside a polygon to split the polygon.
+
+    Credit to https://stackoverflow.com/a/62413539
+    :param line:
+    :param polygon:
+    :return:
+    """
+    minx, miny, maxx, maxy = polygon.bounds
+
+    bounding_box = box(minx, miny, maxx, maxy)
+    p1, p2 = line.boundary
+    if p1.x == p2.x:  # vertical line
+        extended_line = LineString([(p1.x, miny), (p1.x, maxy)])
+    elif p1.y == p2.y:  # horizontal line
+        extended_line = LineString([(minx, p1.y), (maxx, p1.y)])
+    else:
+        # linear equation: y = mx + b
+        m = (p2.y - p1.y) / (p2.x - p1.x)  # Slope
+        b = p1.y - m * p1.x  # y-intercept
+        y0 = m * minx + b
+        y1 = m * maxx + b
+        x0 = (miny - b) / m
+        x1 = (maxy - b) / m
+        points_on_boundary_lines = [Point(minx, y0), Point(maxx, y1), Point(x0, miny), Point(x1, maxy)]
+        unique_points_on_boundary_lines = []
+
+        for p in points_on_boundary_lines:
+            if p not in unique_points_on_boundary_lines:
+                unique_points_on_boundary_lines.append(p)
+
+        points_sorted_by_distance = sorted(unique_points_on_boundary_lines, key=bounding_box.distance)
+        extended_line = LineString(points_sorted_by_distance[:2])
+
+    return extended_line
