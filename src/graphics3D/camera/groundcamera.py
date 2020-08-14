@@ -25,9 +25,11 @@ class GroundCamera(AbstractCamera):
         self.coords.translate(new_local_x[0], new_local_x[1], new_local_x[2])
 
     def __get_global_xz_aligned_vector(self, local_v):
+        # Project vector in standard basis onto xz plane
         global_v = self.coords.change_to_global_basis(local_v)
         global_v[1] = 0
         new_local_v = self.coords.change_to_local_basis(global_v)
+        # Return a vector in the camera basis with magnitude of the original vector
         return np.linalg.norm(local_v) * (new_local_v / np.linalg.norm(new_local_v))
 
     def pedestal_up(self):
@@ -38,32 +40,29 @@ class GroundCamera(AbstractCamera):
         down = self.coords.change_to_local_basis(np.array([0, -self.displacement, 0, 0]))
         self.coords.translate(down[0], down[1], down[2])
 
-    # def tilt_up(self):
-    #     global_x_axis = self.coords.change_to_local_basis(np.array([0, 0, 0, 0]))
-    #     self.coords.rotate_about_arb_axis(global_x_axis, -self.keyboard_rotation_angle)
-    #
-    # def tilt_down(self):
-    #     global_x_axis = self.coords.change_to_local_basis(np.array([1, 0, 0, 0]))
-    #     self.coords.rotate_about_arb_axis(global_x_axis, self.keyboard_rotation_angle)
+    def tilt_up(self):
+        self.coords.rotate_about_x_axis(-self.keyboard_rotation_angle)
+
+    def tilt_down(self):
+        self.coords.rotate_about_x_axis(self.keyboard_rotation_angle)
 
     def mouse_tilt(self, dist):
-        gtl_x_axis = self.coords.change_to_local_basis(np.array([1, 0, 0, 0]))
-        self.coords.rotate_about_arb_axis(gtl_x_axis, dist * self.mouse_rotation_angle)
+        self.coords.rotate_about_x_axis(dist * self.mouse_rotation_angle)
 
     def pan_left(self):
-        gtl_y_axis = self.coords.change_to_local_basis(np.array([0, 1, 0, 0]))
-        self.coords.rotate_about_arb_axis(gtl_y_axis, -self.keyboard_rotation_angle)
+        camera_global_pos = self.coords.change_to_global_basis(np.array([0, 0, 0, 1]))
+        camera_global_pos[1] += 1
+        axis_of_rotation = self.coords.change_to_local_basis(camera_global_pos)
+        self.coords.rotate_about_arb_axis(axis_of_rotation, -self.keyboard_rotation_angle)
 
     def pan_right(self):
-        gtl_y_axis = self.coords.change_to_local_basis(np.array([0, 1, 0, 0]))
-        self.coords.rotate_about_arb_axis(gtl_y_axis, self.keyboard_rotation_angle)
+        camera_global_pos = self.coords.change_to_global_basis(np.array([0, 0, 0, 1]))
+        camera_global_pos[1] += 1
+        axis_of_rotation = self.coords.change_to_local_basis(camera_global_pos)
+        self.coords.rotate_about_arb_axis(axis_of_rotation, self.keyboard_rotation_angle)
 
     def mouse_pan(self, dist):
-        gtl_y_axis = self.coords.change_to_local_basis(np.array([0, 1, 0, 0]))
-        self.coords.rotate_about_arb_axis(gtl_y_axis, dist * self.mouse_rotation_angle)
-
-    def roll_left(self):
-        self.coords.rotate_about_z_axis(-self.keyboard_rotation_angle)
-
-    def roll_right(self):
-        self.coords.rotate_about_z_axis(self.keyboard_rotation_angle)
+        camera_global_pos = self.coords.change_to_global_basis(np.array([0, 0, 0, 1]))
+        camera_global_pos[1] += 1
+        axis_of_rotation = self.coords.change_to_local_basis(camera_global_pos)
+        self.coords.rotate_about_arb_axis(axis_of_rotation, dist * self.mouse_rotation_angle)
