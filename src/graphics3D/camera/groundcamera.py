@@ -33,11 +33,11 @@ class GroundCamera(AbstractCamera):
         return np.linalg.norm(local_v) * (new_local_v / np.linalg.norm(new_local_v))
 
     def pedestal_up(self):
-        up = self.coords.change_to_local_basis(np.array([0, self.displacement, 0, 0]))
+        up = self.coords.change_to_local_basis(np.array([0, -self.displacement, 0, 0]))
         self.coords.translate(up[0], up[1], up[2])
 
     def pedestal_down(self):
-        down = self.coords.change_to_local_basis(np.array([0, -self.displacement, 0, 0]))
+        down = self.coords.change_to_local_basis(np.array([0, self.displacement, 0, 0]))
         self.coords.translate(down[0], down[1], down[2])
 
     def tilt_up(self):
@@ -50,19 +50,19 @@ class GroundCamera(AbstractCamera):
         self.coords.rotate_about_x_axis(dist * self.mouse_rotation_angle)
 
     def pan_left(self):
-        camera_global_pos = self.coords.change_to_global_basis(np.array([0, 0, 0, 1]))
-        camera_global_pos[1] += 1
-        axis_of_rotation = self.coords.change_to_local_basis(camera_global_pos)
+        axis_of_rotation = self.coords.change_to_local_basis(np.array([0, 1, 0, 0]))
         self.coords.rotate_about_arb_axis(axis_of_rotation, -self.keyboard_rotation_angle)
 
     def pan_right(self):
-        camera_global_pos = self.coords.change_to_global_basis(np.array([0, 0, 0, 1]))
-        camera_global_pos[1] += 1
-        axis_of_rotation = self.coords.change_to_local_basis(camera_global_pos)
+        axis_of_rotation = self.coords.change_to_local_basis(np.array([0, 1, 0, 0]))
         self.coords.rotate_about_arb_axis(axis_of_rotation, self.keyboard_rotation_angle)
 
     def mouse_pan(self, dist):
-        camera_global_pos = self.coords.change_to_global_basis(np.array([0, 0, 0, 1]))
-        camera_global_pos[1] += 1
-        axis_of_rotation = self.coords.change_to_local_basis(camera_global_pos)
+        axis_of_rotation = self.coords.change_to_local_basis(np.array([0, 1, 0, 0]))
         self.coords.rotate_about_arb_axis(axis_of_rotation, dist * self.mouse_rotation_angle)
+
+    def roll_left(self):
+        pass
+
+    def roll_right(self):
+        pass
