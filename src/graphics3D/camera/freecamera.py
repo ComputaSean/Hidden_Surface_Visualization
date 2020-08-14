@@ -19,10 +19,10 @@ class FreeCamera(AbstractCamera):
         self.coords.translate(-self.displacement, 0, 0)
 
     def pedestal_up(self):
-        self.coords.translate(0, -self.displacement, 0)
+        self.coords.translate(0, self.displacement, 0)
 
     def pedestal_down(self):
-        self.coords.translate(0, self.displacement, 0)
+        self.coords.translate(0, -self.displacement, 0)
 
     def tilt_up(self):
         self.coords.rotate_about_x_axis(-self.keyboard_rotation_angle)
