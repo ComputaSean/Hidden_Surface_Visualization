@@ -2,12 +2,14 @@ import math
 import sys
 from random import randint
 
+import numpy as np
 import pygame
 from pygame.locals import *
+from shapely.geometry import Point
 
-from graphics3D.camera.freecamera import FreeCamera
 from graphics3D.camera.groundcamera import GroundCamera
 from graphics3D.wireframe import Wireframe
+from sptree.sp_tree import Perspective
 
 
 class Game:
@@ -28,8 +30,9 @@ class Game:
         pygame.K_z: (lambda x: x.camera.roll_right())
     }
 
-    def __init__(self):
+    def __init__(self, sptree):
         pygame.init()
+        self.sptree = sptree
         self.fps = 144
         self.fpsClock = pygame.time.Clock()
         self.screen_width = 1024
@@ -40,7 +43,7 @@ class Game:
 
     def run(self):
 
-        node_radius = 7
+        node_radius = 3
         line_radius = 5
         node_color = (255, 255, 255)
 
@@ -80,7 +83,12 @@ class Game:
 
                 self.screen.fill((0, 0, 0))
 
-                for wf in self.wireframes:
+                camera_location_3d = self.camera.coords.change_to_global_basis(np.array([0, 0, 0, 1]))
+                camera_location_2d = Point(camera_location_3d[0], camera_location_3d[2])
+
+                render_order = self.__get_render_order(self.sptree, camera_location_2d)
+
+                for wf in render_order:
 
                     for n1, n2, edge_color in wf.get_global_edges():
                         pr_line_start = self.get_camera_visible_projection(n1)
@@ -127,6 +135,54 @@ class Game:
             return rs_x, rs_y
 
         return None
+
+    @staticmethod
+    def __get_render_order(sptree, camera_location):
+        render_order = []
+        Game.__get_render_order_helper(sptree.root, sptree.bounding_box, camera_location, render_order)
+        return render_order
+
+    @staticmethod
+    def __get_render_order_helper(cur_node, bounding_box, camera_location, render_order):
+        if cur_node is None:
+            return
+
+        elif cur_node.is_leaf():
+            Game.__get_walls_at_node(cur_node, render_order)
+
+        elif Perspective.classify(camera_location, cur_node.lines[0], bounding_box) == Perspective.FRONT:
+            Game.__get_render_order_helper(cur_node.right, bounding_box, camera_location, render_order)
+            Game.__get_walls_at_node(cur_node, render_order)
+            Game.__get_render_order_helper(cur_node.left, bounding_box, camera_location, render_order)
+
+        elif Perspective.classify(camera_location, cur_node.lines[0], bounding_box) == Perspective.BACK:
+            Game.__get_render_order_helper(cur_node.left, bounding_box, camera_location, render_order)
+            Game.__get_walls_at_node(cur_node, render_order)
+            Game.__get_render_order_helper(cur_node.right, bounding_box, camera_location, render_order)
+
+        else:
+            Game.__get_render_order_helper(cur_node.left, bounding_box, camera_location, render_order)
+            Game.__get_render_order_helper(cur_node.right, bounding_box, camera_location, render_order)
+
+    @staticmethod
+    def __get_walls_at_node(node, render_order):
+        for line in node.lines:
+            render_order.append(Game.__convert_line_to_wall(line))
+
+    @staticmethod
+    def __convert_line_to_wall(line):
+        height = 75
+        edge_color = (255, 255, 255)
+        wall_color = (0, 255, 0)
+        wall = Wireframe()
+        start, end = tuple(line.coords)
+        wall.add_node(start[0], 0, start[1])
+        wall.add_node(end[0], 0, end[1])
+        wall.add_node(end[0], height, end[1])
+        wall.add_node(start[0], height, start[1])
+        wall.add_edges(((0, 1, edge_color), (1, 2, edge_color), (2, 3, edge_color), (3, 0, edge_color)))
+        wall.add_mesh(((0, 1, 2, 3), wall_color))
+        return wall
 
 
 def get_rand_color():
