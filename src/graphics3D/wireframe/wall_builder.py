@@ -10,20 +10,20 @@ class WallBuilder(WireframeBuilder):
     def __init__(self, base, height, edge_color, mesh_color):
         super().__init__()
         self._base = base
-        self._normal = self._create_normal(base)
+        self._normal = WallBuilder._create_normal(base)
         self._height = height
         self._edge_color = edge_color
         self._mesh_color = mesh_color
 
     @staticmethod
     def _create_normal(line):
+        # Normal is always on the 'right' side when facing in the direction of the line
+        # This is with reference to how the wall will be built; when facing the wall standing at the normal
+        # the winding order of the wall nodes will be ccw.
         start, end = tuple(line.coords)
-        # Calculate normal components
-        nx = end[1] - start[1]
-        ny = -(end[0] - start[0])
-        normal = np.array([nx, ny])
-        normal /= np.linalg.norm(normal)
         cx, cy = line.centroid.coords[0]
+        normal = np.array([end[1] - start[1], -(end[0] - start[0])])
+        normal /= np.linalg.norm(normal)
         return LineString([(cx, cy), (cx + normal[0], cy + normal[1])])
 
     def build(self):
