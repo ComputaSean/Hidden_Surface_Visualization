@@ -5,7 +5,7 @@ import pygame
 from pygame.locals import *
 from shapely.geometry import Point
 
-from src.sptree.sp_tree import Perspective
+from sptree.sp_tree import Perspective
 
 
 class PyGameGraphics:
@@ -87,14 +87,14 @@ class PyGameGraphics:
 
                 # Move camera if there's a movement key pressed
                 if w_down or s_down or a_down or d_down:
-                    self.__update_camera_location(w_down, s_down, a_down, d_down)
+                    self._update_camera_location(w_down, s_down, a_down, d_down)
                     clear_screen = True  # Update camera dot on screen
 
             # Update
 
             # Only need to update render order if the camera moved
             if moved:
-                render_order = PyGameGraphics.__get_render_order(self.sptree, self.camera_location)
+                render_order = PyGameGraphics._get_render_order(self.sptree, self.camera_location)
                 moved = False
 
             # Render
@@ -111,7 +111,7 @@ class PyGameGraphics:
                 # Only draw when there are more lines to be drawn
                 if r_index < len(render_order):
                     line = render_order[r_index]
-                    pygame.draw.line(self.screen, PyGameGraphics.__get_random_color(),
+                    pygame.draw.line(self.screen, PyGameGraphics._get_random_color(),
                                      line.coords[0], line.coords[1], 5)
                     r_index += 1
                 draw_next_line = False
@@ -120,7 +120,7 @@ class PyGameGraphics:
                 # Draw remaining lines (if any)
                 for i in range(r_index, len(render_order)):
                     line = render_order[i]
-                    pygame.draw.line(self.screen, PyGameGraphics.__get_random_color(),
+                    pygame.draw.line(self.screen, PyGameGraphics._get_random_color(),
                                      line.coords[0], line.coords[1], 5)
                 draw_all_lines = False
                 r_index = len(render_order)  # No more lines left to draw
@@ -129,43 +129,43 @@ class PyGameGraphics:
             self.fpsClock.tick(self.fps)
 
     @staticmethod
-    def __get_render_order(sptree, camera_location):
-        return PyGameGraphics.__get_render_order_helper(sptree.root, sptree.bounding_box, camera_location)
+    def _get_render_order(sptree, camera_location):
+        return PyGameGraphics._get_render_order_helper(sptree.root, sptree.bounding_box, camera_location)
 
     @staticmethod
-    def __get_render_order_helper(cur_node, bounding_box, camera_location):
+    def _get_render_order_helper(cur_node, bounding_box, camera_location):
         render_order = []
 
         if cur_node is None:
             pass
 
         elif cur_node.is_leaf():
-            render_order.extend(PyGameGraphics.__get_lines_at_node(cur_node))
+            render_order.extend(PyGameGraphics._get_lines_at_node(cur_node))
 
         elif Perspective.classify(camera_location, cur_node.lines[0], bounding_box) == Perspective.FRONT:
-            render_order.extend(PyGameGraphics.__get_render_order_helper(cur_node.right, bounding_box, camera_location))
-            render_order.extend(PyGameGraphics.__get_lines_at_node(cur_node))
-            render_order.extend(PyGameGraphics.__get_render_order_helper(cur_node.left, bounding_box, camera_location))
+            render_order.extend(PyGameGraphics._get_render_order_helper(cur_node.right, bounding_box, camera_location))
+            render_order.extend(PyGameGraphics._get_lines_at_node(cur_node))
+            render_order.extend(PyGameGraphics._get_render_order_helper(cur_node.left, bounding_box, camera_location))
 
         elif Perspective.classify(camera_location, cur_node.lines[0], bounding_box) == Perspective.BACK:
-            render_order.extend(PyGameGraphics.__get_render_order_helper(cur_node.left, bounding_box, camera_location))
-            render_order.extend(PyGameGraphics.__get_lines_at_node(cur_node))
-            render_order.extend(PyGameGraphics.__get_render_order_helper(cur_node.right, bounding_box, camera_location))
+            render_order.extend(PyGameGraphics._get_render_order_helper(cur_node.left, bounding_box, camera_location))
+            render_order.extend(PyGameGraphics._get_lines_at_node(cur_node))
+            render_order.extend(PyGameGraphics._get_render_order_helper(cur_node.right, bounding_box, camera_location))
 
         else:
-            render_order.extend(PyGameGraphics.__get_render_order_helper(cur_node.left, bounding_box, camera_location))
-            render_order.extend(PyGameGraphics.__get_render_order_helper(cur_node.right, bounding_box, camera_location))
+            render_order.extend(PyGameGraphics._get_render_order_helper(cur_node.left, bounding_box, camera_location))
+            render_order.extend(PyGameGraphics._get_render_order_helper(cur_node.right, bounding_box, camera_location))
 
         return render_order
 
     @staticmethod
-    def __get_lines_at_node(node):
+    def _get_lines_at_node(node):
         render_order = []
         for line in node.lines:
             render_order.append(line)
         return render_order
 
-    def __update_camera_location(self, w_down, s_down, a_down, d_down):
+    def _update_camera_location(self, w_down, s_down, a_down, d_down):
         cx, cy = self.camera_location.coords[0]
         if w_down:
             self.camera_location = Point((cx, cy - 1))
@@ -177,5 +177,5 @@ class PyGameGraphics:
             self.camera_location = Point((cx + 1, cy))
 
     @staticmethod
-    def __get_random_color():
+    def _get_random_color():
         return randint(0, 255), randint(0, 255), randint(0, 255)

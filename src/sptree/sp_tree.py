@@ -4,28 +4,26 @@ from enum import Enum
 from shapely.geometry import box, LineString, Point, LinearRing
 from shapely.ops import split
 
-from src.vectorline.vector_line import VectorLine
-
 error = 1e-13  # Floating point precision
 
 
 class SPTree:
 
     def __init__(self, lines, bounding_box):
-        self.root = SPTree.__construct(lines, bounding_box)
+        self.root = SPTree._construct(lines, bounding_box)
         self.bounding_box = bounding_box
 
     @staticmethod
-    def __construct(lines, bounding_box):
+    def _construct(lines, bounding_box):
         if len(lines) == 0:
             return None
 
-        splitting_line = SPTree.__pick_splitting_line(lines, bounding_box)
+        splitting_line = SPTree._pick_splitting_line(lines, bounding_box)
         coincident_lines = [splitting_line]
         front = []
         back = []
 
-        splitting_plane = get_splitting_plane(splitting_line, bounding_box)
+        splitting_plane = _get_splitting_plane(splitting_line, bounding_box)
 
         for i in range(len(lines)):
             if lines[i] == splitting_line:
@@ -39,22 +37,22 @@ class SPTree:
             # Splitting plane crosses line
             elif splitting_plane.crosses(line):
                 first_half, second_half = split(line, splitting_plane)
-                first_half = VectorLine(first_half.coords, line.normal_dir)
-                second_half = VectorLine(second_half.coords, line.normal_dir)
-                SPTree.__categorize_line(first_half, splitting_line, front, back)
-                SPTree.__categorize_line(second_half, splitting_line, front, back)
+                first_line = LineString(first_half.coords)
+                second_line = LineString(second_half.coords)
+                SPTree._categorize_line(first_line, splitting_line, front, back)
+                SPTree._categorize_line(second_line, splitting_line, front, back)
             # Line enclosed within one of the planes created by the splitting plane
             else:
-                SPTree.__categorize_line(line, splitting_line, front, back)
+                SPTree._categorize_line(line, splitting_line, front, back)
 
-        front_node = SPTree.__construct(front, bounding_box)
-        back_node = SPTree.__construct(back, bounding_box)
+        front_node = SPTree._construct(front, bounding_box)
+        back_node = SPTree._construct(back, bounding_box)
         cur_node = Node(coincident_lines, front_node, back_node)
 
         return cur_node
 
     @staticmethod
-    def __pick_splitting_line(lines, bounding_box):
+    def _pick_splitting_line(lines, bounding_box):
         """
         Randomly selects a sampling of lines and returns the one that results in the least number of lines split
         from its splitting plane.
@@ -67,7 +65,7 @@ class SPTree:
         sample_num_pieces = []
         for i in range(len(line_sample)):
             num_pieces = 0
-            splitting_plane = get_splitting_plane(line_sample[i], bounding_box)
+            splitting_plane = _get_splitting_plane(line_sample[i], bounding_box)
             for j in range(len(line_sample)):
                 if j == i:
                     continue
@@ -89,8 +87,8 @@ class SPTree:
         return line_sample[min_index]
 
     @staticmethod
-    def __categorize_line(line, splitting_line, front, behind):
-        if is_point_in_front_of_line(splitting_line, line.centroid):
+    def _categorize_line(line, splitting_line, front, behind):
+        if _is_point_in_front_of_line(splitting_line, line.centroid):
             front.append(line)
         else:
             behind.append(line)
@@ -114,33 +112,25 @@ class Perspective(Enum):
 
     @staticmethod
     def classify(point, splitting_line, bounding_box):
-        splitting_plane = get_splitting_plane(splitting_line, bounding_box)
-        if splitting_plane.distance(point) < error:
+        if _get_splitting_plane(splitting_line, bounding_box).distance(point) < error:
             return Perspective.ON
-        if is_point_in_front_of_line(splitting_line, point):
+        if _is_point_in_front_of_line(splitting_line, point):
             return Perspective.FRONT
         else:
             return Perspective.BACK
 
 
-def is_point_in_front_of_line(line, point):
+def _is_point_in_front_of_line(line, point):
     """
     Determines whether the point is in front or behind the line.
 
-    https://stackoverflow.com/questions/50393718/determine-the-left-and-right-side-of-a-split-shapely-geometry
-    :param line:
-    :param point:
-    :return:
+    Winding order for line start, line end, and normal is clockwise.
+    If point is in front it will have the same winding order.
     """
-    # If both linear rings result in the same winding order, then the point must be on the same side as the normal and
-    # hence in the front of the line
-    normal_end_point = Point(line.normal.coords[1])
-    normal_on_left = LinearRing([line.coords[0], line.coords[1], normal_end_point]).is_ccw
-    line_on_left = LinearRing([line.coords[0], line.coords[1], point]).is_ccw
-    return normal_on_left == line_on_left
+    return not LinearRing([line.coords[0], line.coords[1], point]).is_ccw
 
 
-def get_splitting_plane(line, polygon):
+def _get_splitting_plane(line, polygon):
     """
     Extends a line inside a polygon to split the polygon.
 
