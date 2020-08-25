@@ -30,7 +30,7 @@ class Game:
 
     def __init__(self, sptree):
         pygame.init()
-        sptree.build_walls()
+        sptree.build_walls(50, (255, 255, 255), (0, 255, 0))
         self.sptree = sptree
         self.fps = 144
         self.fpsClock = pygame.time.Clock()
