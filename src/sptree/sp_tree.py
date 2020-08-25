@@ -4,6 +4,8 @@ from enum import Enum
 from shapely.geometry import box, LineString, Point, LinearRing
 from shapely.ops import split
 
+from graphics3D.wireframe.wall_builder import WallBuilder
+
 error = 1e-13  # Floating point precision
 
 
@@ -12,6 +14,7 @@ class SPTree:
     def __init__(self, lines, bounding_box):
         self.root = SPTree._construct(lines, bounding_box)
         self.bounding_box = bounding_box
+        self.walls_built = False
 
     @staticmethod
     def _construct(lines, bounding_box):
@@ -93,6 +96,18 @@ class SPTree:
         else:
             behind.append(line)
 
+    def build_walls(self):
+        if not self.walls_built:
+            SPTree._build_walls(self.root)
+        self.walls_built = True
+
+    @staticmethod
+    def _build_walls(node):
+        if node is not None:
+            node.wall = WallBuilder(node.lines[0], 50, (255, 255, 255), (0, 255, 0)).build()
+            SPTree._build_walls(node.left)
+            SPTree._build_walls(node.right)
+
 
 class Node:
 
@@ -100,6 +115,7 @@ class Node:
         self.lines = lines
         self.left = left  # front
         self.right = right  # back
+        self.wall = None
 
     def is_leaf(self):
         return self.left is None and self.right is None
