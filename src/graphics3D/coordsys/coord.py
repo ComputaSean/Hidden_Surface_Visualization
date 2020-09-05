@@ -5,10 +5,10 @@ import numpy as np
 
 class Coord:
 
-    def __init__(self, basis):
+    def __init__(self, basis: np.array) -> None:
         self.basis = basis
 
-    def rotate_about_arb_axis(self, axis, angle):
+    def rotate_about_arb_axis(self, axis: np.array, angle: float) -> None:
         normalized = axis / np.linalg.norm(axis)
         ux = normalized[0]
         uy = normalized[1]
@@ -16,78 +16,56 @@ class Coord:
         c = cos(angle)
         s = sin(angle)
         rotation_matrix = np.array(
-            [[c + (ux ** 2) * (1 - c), ux * uy * (1 - c) - uz * s, ux * uz * (1 - c) + uy * s, 0],
-             [uy * ux * (1 - c) + uz * s, c + (uy ** 2) * (1 - c), uy * uz * (1 - c) - ux * s, 0],
-             [uz * ux * (1 - c) - uy * s, uz * uy * (1 - c) + ux * s, c + (uz ** 2) * (1 - c), 0],
-             [0, 0, 0, 1]]).T
-
+            [[c + (ux ** 2) * (1 - c), uy * ux * (1 - c) + uz * s, uz * ux * (1 - c) - uy * s, 0],
+             [ux * uy * (1 - c) - uz * s, c + (uy ** 2) * (1 - c), uz * uy * (1 - c) + ux * s, 0],
+             [ux * uz * (1 - c) + uy * s, uy * uz * (1 - c) - ux * s, c + (uz ** 2) * (1 - c), 0],
+             [0, 0, 0, 1]])
         self.basis = np.matmul(self.basis, rotation_matrix)
 
-    def rotate_about_x_axis(self, angle):
-        self.basis = np.matmul(self.basis, Coord.__get_x_rotation_matrix(angle))
+    def rotate_about_x_axis(self, angle: float) -> None:
+        rotation_matrix = np.array([[1, 0, 0, 0],
+                                    [0, cos(angle), sin(angle), 0],
+                                    [0, -sin(angle), cos(angle), 0],
+                                    [0, 0, 0, 1]])
+        self.basis = np.matmul(self.basis, rotation_matrix)
 
-    @staticmethod
-    def __get_x_rotation_matrix(a):
-        return np.array([[1, 0, 0, 0],
-                         [0, cos(a), sin(a), 0],
-                         [0, -sin(a), cos(a), 0],
-                         [0, 0, 0, 1]])
+    def rotate_about_y_axis(self, angle: float) -> None:
+        rotation_matrix = np.array([[cos(angle), 0, -sin(angle), 0],
+                                    [0, 1, 0, 0],
+                                    [sin(angle), 0, cos(angle), 0],
+                                    [0, 0, 0, 1]])
+        self.basis = np.matmul(self.basis, rotation_matrix)
 
-    def rotate_about_y_axis(self, angle):
-        self.basis = np.matmul(self.basis, Coord.__get_y_rotation_matrix(angle))
+    def rotate_about_z_axis(self, angle: float) -> None:
+        rotation_matrix = np.array([[cos(angle), sin(angle), 0, 0],
+                                    [-sin(angle), cos(angle), 0, 0],
+                                    [0, 0, 1, 0],
+                                    [0, 0, 0, 1]])
+        self.basis = np.matmul(self.basis, rotation_matrix)
 
-    @staticmethod
-    def __get_y_rotation_matrix(a):
-        return np.array([[cos(a), 0, -sin(a), 0],
-                         [0, 1, 0, 0],
-                         [sin(a), 0, cos(a), 0],
-                         [0, 0, 0, 1]])
-
-    def rotate_about_z_axis(self, angle):
-        self.basis = np.matmul(self.basis, Coord.__get_z_rotation_matrix(angle))
-
-    @staticmethod
-    def __get_z_rotation_matrix(a):
-        return np.array([[cos(a), sin(a), 0, 0],
-                         [-sin(a), cos(a), 0, 0],
-                         [0, 0, 1, 0],
-                         [0, 0, 0, 1]])
-
-    def translate(self, x_units, y_units, z_units):
+    def translate(self, x_units: float, y_units: float, z_units: float) -> None:
         """
         Units are in the basis of self
-        :param x_units:
-        :param y_units:
-        :param z_units:
         :return:
         """
-        self.basis = np.matmul(self.basis, self.__get_translation_matrix(x_units, y_units, z_units))
+        translation_matrix = np.array([[1, 0, 0, 0],
+                                       [0, 1, 0, 0],
+                                       [0, 0, 1, 0],
+                                       [x_units, y_units, z_units, 1]])
+        self.basis = np.matmul(self.basis, translation_matrix)
 
-    @staticmethod
-    def __get_translation_matrix(x_units, y_units, z_units):
-        return np.array([[1, 0, 0, 0],
-                         [0, 1, 0, 0],
-                         [0, 0, 1, 0],
-                         [x_units, y_units, z_units, 1]])
-
-    def scale(self, x_factor, y_factor, z_factor):
+    def scale(self, x_factor: float, y_factor: float, z_factor: float) -> None:
         """
         Units are in the basis of self
-        :param x_units:
-        :param y_units:
-        :param z_units:
         :return:
         """
-        self.basis = np.matmul(self.basis, self.__get_scale_matrix(x_factor, y_factor, z_factor))
+        scale_matrix = np.array([[x_factor, 0, 0, 0],
+                                 [0, y_factor, 0, 0],
+                                 [0, 0, z_factor, 0],
+                                 [0, 0, 0, 1]])
+        self.basis = np.matmul(self.basis, scale_matrix)
 
-    @staticmethod
-    def __get_scale_matrix(x_factor, y_factor, z_factor):
-        return np.array([[x_factor, 0, 0, 0],
-                         [0, y_factor, 0, 0],
-                         [0, 0, z_factor, 0],
-                         [0, 0, 0, 1]])
-
-    def change_to_local_basis(self, v):
+    def change_to_local_basis(self, v: np.array) -> np.array:
         """
         Change of basis from global basis to local basis.
         Applies all the transformations.
@@ -97,7 +75,7 @@ class Coord:
         """
         return np.matmul(v, self.basis)
 
-    def change_to_global_basis(self, v):
+    def change_to_global_basis(self, v: np.array) -> np.array:
         """
         Change of basis from local basis to global basis.
         Undoes all the transformations.
