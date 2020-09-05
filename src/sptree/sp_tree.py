@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import List, Optional, Generator, Tuple
 
 from shapely.geometry import box, LineString, Point, LinearRing, Polygon
 from shapely.ops import split
@@ -20,10 +20,10 @@ class SPTree:
     behind the splitting line.
     """
 
-    def __init__(self, lines, bounding_box) -> None:
+    def __init__(self, lines, bounding_box: box) -> None:
         self.root = SPTree._construct(lines, bounding_box)
         self.bounding_box = bounding_box
-        self.walls_built = False  # Flag for if walls have been created for each node
+        self.walls_built = False
 
     @staticmethod
     def _construct(lines: List[LineString], bounding_box: box) -> Optional[Node]:
@@ -134,6 +134,37 @@ class SPTree:
         else:
             behind.append(line)
 
+    def painters_alg(self, point: Point):
+        return SPTree._painters_alg(self.root, point, self.bounding_box)
+
+    @staticmethod
+    def _painters_alg(cur_node: Node, point: Point, bounding_box: box) -> Generator[Node, None, None]:
+        if cur_node is None:
+            raise StopIteration
+
+        elif cur_node.is_leaf():
+            yield cur_node
+
+        elif Perspective.classify(point, cur_node.lines[0], bounding_box) == Perspective.FRONT:
+            if cur_node.right is not None:
+                yield from SPTree._painters_alg(cur_node.right, point, bounding_box)
+            yield cur_node
+            if cur_node.left is not None:
+                yield from SPTree._painters_alg(cur_node.left, point, bounding_box)
+
+        elif Perspective.classify(point, cur_node.lines[0], bounding_box) == Perspective.BACK:
+            if cur_node.left is not None:
+                yield from SPTree._painters_alg(cur_node.left, point, bounding_box)
+            yield cur_node
+            if cur_node.right is not None:
+                yield from SPTree._painters_alg(cur_node.right, point, bounding_box)
+
+        else:
+            if cur_node.left is not None:
+                yield from SPTree._painters_alg(cur_node.left, point, bounding_box)
+            if cur_node.right is not None:
+                yield from SPTree._painters_alg(cur_node.right, point, bounding_box)
+
     def build_walls(self, height: int, edge_color: Tuple[int, int, int], mesh_color: Tuple[int, int, int]) -> None:
         """
         Build the walls corresponding to each node of the SPTree.
@@ -181,7 +212,7 @@ class Perspective(Enum):
 
         :param point: point being classified
         :param line: line being used as the point of reference
-        :param bounding_box: bounding box for line
+        :param bounding_box:
         :return: ON if point is on the line, FRONT if point is in front of the line, or BACK if point is behind the line
         """
         if _get_splitting_plane(line, bounding_box).distance(point) < error:
