@@ -2,12 +2,12 @@ import math
 
 import numpy as np
 
-from graphics3D.coord import Coord
+from graphics3D.coordsys.coord import Coord
 
 
 class AbstractCamera:
 
-    def __init__(self, focal_length, canvas_width, canvas_height):
+    def __init__(self, focal_length: float, canvas_width: int, canvas_height: int):
         self.coords = Coord(np.array([[1, 0, 0, 0],
                                       [0, 1, 0, 0],
                                       [0, 0, -1, 0],
@@ -19,44 +19,44 @@ class AbstractCamera:
         self.mouse_rotation_angle = math.pi / 1800
         self.displacement = 10
 
-    def dolly_forward(self):
+    def dolly_forward(self) -> None:
         raise NotImplementedError
 
-    def dolly_backward(self):
+    def dolly_backward(self) -> None:
         raise NotImplementedError
 
-    def truck_left(self):
+    def truck_left(self) -> None:
         raise NotImplementedError
 
-    def truck_right(self):
+    def truck_right(self) -> None:
         raise NotImplementedError
 
-    def pedestal_up(self):
+    def pedestal_up(self) -> None:
         raise NotImplementedError
 
-    def pedestal_down(self):
+    def pedestal_down(self) -> None:
         raise NotImplementedError
 
-    def tilt_up(self):
+    def tilt_up(self) -> None:
         raise NotImplementedError
 
-    def tilt_down(self):
+    def tilt_down(self) -> None:
         raise NotImplementedError
 
-    def mouse_tilt(self, dist):
+    def mouse_tilt(self, dist: float) -> None:
         raise NotImplementedError
 
-    def pan_left(self):
+    def pan_left(self) -> None:
         raise NotImplementedError
 
-    def pan_right(self):
+    def pan_right(self) -> None:
         raise NotImplementedError
 
-    def mouse_pan(self, dist):
+    def mouse_pan(self, dist) -> None:
         raise NotImplementedError
 
-    def roll_left(self):
+    def roll_left(self) -> None:
         raise NotImplementedError
 
-    def roll_right(self):
+    def roll_right(self) -> None:
         raise NotImplementedError
