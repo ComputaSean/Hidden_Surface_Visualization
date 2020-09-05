@@ -115,9 +115,9 @@ class Game:
 
         wf = node.wall
 
-        for n1, n2, edge_color in wf.get_global_edges():
-            pr_line_start = self._get_camera_visible_projection(n1)
-            pr_line_end = self._get_camera_visible_projection(n2)
+        for nodes, edge_color in wf.get_global_edges():
+            pr_line_start = self._get_camera_visible_projection(nodes[0])
+            pr_line_end = self._get_camera_visible_projection(nodes[1])
             if pr_line_start is not None and pr_line_end is not None:
                 pygame.draw.line(self.screen, edge_color, pr_line_start, pr_line_end, line_radius)
 
@@ -126,14 +126,14 @@ class Game:
             if pr_pt is not None:
                 pygame.draw.circle(self.screen, node_color, pr_pt, node_radius)
 
-        for mesh in wf.get_global_meshes():
+        for meshes, colour in wf.get_global_meshes():
             mesh_nodes = []
-            for node in mesh[0]:
+            for node in meshes:
                 pr_pt = self._get_camera_visible_projection(node)
                 if pr_pt is not None:
                     mesh_nodes.append(pr_pt)
             if len(mesh_nodes) > 2:
-                pygame.draw.polygon(self.screen, mesh[1], mesh_nodes)
+                pygame.draw.polygon(self.screen, colour, mesh_nodes)
 
     def _get_camera_visible_projection(self, node):
         # Camera space point

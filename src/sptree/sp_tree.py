@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 from shapely.geometry import box, LineString, Point, LinearRing, Polygon
 from shapely.ops import split
 
-from graphics3D.wireframe.wall_builder import WallBuilder
+from graphics3D.wireframe.wall.wall_builder import WallBuilder
 from sptree.node import Node
 
 error = 1e-13  # Floating point precision
