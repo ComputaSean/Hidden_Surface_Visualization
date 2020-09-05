@@ -20,23 +20,11 @@ class Coord:
              [uy * ux * (1 - c) + uz * s, c + (uy ** 2) * (1 - c), uy * uz * (1 - c) - ux * s, 0],
              [uz * ux * (1 - c) - uy * s, uz * uy * (1 - c) + ux * s, c + (uz ** 2) * (1 - c), 0],
              [0, 0, 0, 1]]).T
-        # np.array([[c + (ux ** 2) * (1 - c), uy * ux * (1 - c) + uz * s, uz * ux * (1 - c) - uy * s, 0],
-        #           [ux * uy * (1 - c) - ux * s, c + (uy ** 2) * (1 - c), uz * uy * (1 - c) + ux * s, 0],
-        #           [ux * uz * (1 - c) + uy * s, uy * uz * (1 - c) - ux * s, c + (uz ** 2) * (1 - c), 0],
-        #           [0, 0, 0, 1]])
 
         self.basis = np.matmul(self.basis, rotation_matrix)
 
     def rotate_about_x_axis(self, angle):
         self.basis = np.matmul(self.basis, Coord.__get_x_rotation_matrix(angle))
-
-    # def rotate_about_x_axis_limited(self, angle):
-    #     rotation_result = np.matmul(self.basis, Coord.__get_x_rotation_matrix(angle))
-    #     new_z_global = self.change_to_global_basis(np.array([0, 0, 1, 0]))
-    #     cross_product = np.cross(new_z_global[:3], np.array([0, 1, 0]))
-    #     print(np.linalg.norm(cross_product))
-    #     if np.linalg.norm(cross_product) > 0.5:
-    #         self.basis = rotation_result
 
     @staticmethod
     def __get_x_rotation_matrix(a):
@@ -118,7 +106,3 @@ class Coord:
         :return:
         """
         return np.matmul(v, np.linalg.inv(self.basis))
-
-
-if __name__ == "__main__":
-    pass
