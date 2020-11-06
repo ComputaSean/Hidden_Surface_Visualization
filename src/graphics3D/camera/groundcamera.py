@@ -4,6 +4,9 @@ from graphics3D.camera.abstractcamera import AbstractCamera
 
 
 class GroundCamera(AbstractCamera):
+    """
+    Camera motions are done with respect to the ground/xz-plane.
+    """
 
     def __init__(self, focal_length: float = 1, canvas_width: int = 1, canvas_height: int = 1):
         super().__init__(focal_length, canvas_width, canvas_height)
@@ -24,7 +27,13 @@ class GroundCamera(AbstractCamera):
         new_local_x = self._get_global_xz_aligned_vector(np.array((-self.displacement, 0, 0, 0)))
         self.coords.translate(new_local_x[0], new_local_x[1], new_local_x[2])
 
-    def _get_global_xz_aligned_vector(self, local_v: np.array) -> np.array:
+    def _get_global_xz_aligned_vector(self, local_v: np.ndarray) -> np.ndarray:
+        """
+        Converts a local vector into another local vector that is parallel to the global xz-plane.
+
+        :param local_v: vector in the local basis of the camera
+        :return: vector of the same magnitude that is parallel to the global xz-plane
+        """
         # Project vector in standard basis onto xz plane
         global_v = self.coords.change_to_global_basis(local_v)
         global_v[1] = 0

@@ -1,4 +1,3 @@
-import sys
 from random import randint
 from typing import Tuple
 
@@ -8,8 +7,23 @@ from shapely.geometry import Point
 
 from sptree.sp_tree import SPTree
 
+Color = Tuple[int, int, int]
+
 
 class Graphics2D:
+    """
+    Visualizes hidden surface determination from a top-down perspective for a dynamic scene.
+    The red dot represents the user's camera which can be moved by the keyboard.
+    Clicking Mouse1 will draw the walls using painter's algorithm.
+
+    W - moves camera forward
+    A - moves camera backward
+    S - moves camera left
+    D - moves camera right
+    Mouse1 - draws a single wall
+    Mouse2 - clears the screen of all drawn walls
+    Mouse3 - draw all remaining walls
+    """
     key_to_motion = {
         pygame.K_w: (lambda x: x.update_camera_location(0, -1)),
         pygame.K_s: (lambda x: x.update_camera_location(0, 1)),
@@ -28,14 +42,19 @@ class Graphics2D:
         self.camera_location = Point((maxx // 2, maxy // 2))  # Camera starts centered
 
     def run(self) -> None:
+        """
+        Starts the game loop of the visualization.
+        The game loop contains the logic to update the visualization and to render it.
 
-        draw_order = None
+        :return: None
+        """
+        pygame.key.set_repeat(10, 10)  # Required for continuous motion when key is held down
+
         camera_moved = True  # Flag for when the camera has moved
         clear_screen = True  # Flag for when the screen should be wiped
-        draw_all_lines = False  # Flag for when all remaining lines should be drawn
-        draw_next_line = False  # Flag to drawn the next line to render
-
-        pygame.key.set_repeat(10, 10)  # Required for continuous motion when key is held down
+        draw_order = None  # Generator for the next wall to be drawn given the camera's current position
+        draw_all_walls = False  # Flag for when all remaining walls should be drawn
+        draw_next_wall = False  # Flag to draw the next wall
 
         # Game loop
         while True:
@@ -45,16 +64,16 @@ class Graphics2D:
 
                 if event.type == QUIT:
                     pygame.quit()
-                    sys.exit()
+                    return
 
                 if event.type == pygame.MOUSEBUTTONUP:
-                    # Left click - draw next line
+                    # Mouse1 - draw next wall
                     if event.button == 1:
-                        draw_next_line = True
-                    # Middle click - draw all remaining lines
+                        draw_next_wall = True
+                    # Mouse2 - draw all remaining walls
                     elif event.button == 2:
-                        draw_all_lines = True
-                    # Right click - clear_screen screen
+                        draw_all_walls = True
+                    # Mouse3 - clear screen
                     elif event.button == 3:
                         clear_screen = True
 
@@ -63,45 +82,57 @@ class Graphics2D:
                         Graphics2D.key_to_motion[event.key](self)
                         camera_moved = True
 
-            # Render
-
-            # Only need to update render order if the camera moved
+            # Draw order needs to be updated when the the camera moved
             if camera_moved:
                 draw_order = self.sptree.painters_alg(self.camera_location)
                 camera_moved = False
                 clear_screen = True
+
+            # Render
 
             if clear_screen:
                 self.screen.fill((255, 255, 255))  # Whiteout screen
                 pygame.draw.rect(self.screen, (0, 0, 0), self.border, 5)  # Draw bounding box
                 pygame.draw.circle(self.screen, (255, 0, 0),
                                    tuple(map(int, self.camera_location.coords[0])), 5)  # Draw camera dot
-                draw_order = self.sptree.painters_alg(self.camera_location)
+                draw_order = self.sptree.painters_alg(self.camera_location)  # Reset generator
                 clear_screen = False
 
-            if draw_next_line:
-                # Only draw when there are more lines to be drawn
-                node = next(draw_order, None)
-                if node is not None:
+            if draw_next_wall:
+                # Only draw when there are more walls to be drawn
+                coincident_walls = next(draw_order, [])
+                for wall in coincident_walls:
+                    wall_base = wall.get_base()
                     pygame.draw.line(self.screen, Graphics2D._get_random_color(),
-                                     node.lines[0].coords[0], node.lines[0].coords[1], 5)
-                draw_next_line = False
+                                     wall_base.coords[0], wall_base.coords[1], 5)
+                draw_next_wall = False
 
-            if draw_all_lines:
-                # Draw remaining lines (if any)
-                for node in draw_order:
-                    pygame.draw.line(self.screen, Graphics2D._get_random_color(),
-                                     node.lines[0].coords[0], node.lines[0].coords[1], 5)
-                draw_all_lines = False
+            if draw_all_walls:
+                # Draw remaining walls (if any)
+                for coincident_walls in draw_order:
+                    for wall in coincident_walls:
+                        wall_base = wall.get_base()
+                        pygame.draw.line(self.screen, Graphics2D._get_random_color(),
+                                         wall_base.coords[0], wall_base.coords[1], 5)
+                draw_all_walls = False
 
             pygame.display.flip()
             self.fpsClock.tick(self.fps)
 
     def update_camera_location(self, dx: int, dy: int) -> None:
+        """
+        Moves the camera's position by (dx, dy).
+
+        :param dx: distance to move along the x-axis
+        :param dy: distance to move along the y-axis
+        :return: None
+        """
         cx, cy = self.camera_location.coords[0]
         self.camera_location = Point((cx + dx, cy + dy))
-        print(self.camera_location)
 
     @staticmethod
-    def _get_random_color() -> Tuple[int, int, int]:
+    def _get_random_color() -> Color:
+        """
+        :return: a random rgb color
+        """
         return randint(0, 255), randint(0, 255), randint(0, 255)

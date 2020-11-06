@@ -2,31 +2,30 @@ from __future__ import annotations
 
 import random
 from enum import Enum
-from typing import List, Optional, Generator, Tuple
+from typing import List, Optional, Generator
 
 from shapely.geometry import box, LineString, Point, LinearRing, Polygon
-from shapely.ops import split
 
-from graphics3D.wireframe.wall.wall_builder import WallBuilder
+from sptree.line_wrapper import LineWrapper
 from sptree.node import Node
+from sptree.partitionable import Partitionable
 
 error = 1e-13  # Floating point precision
 
 
 class SPTree:
     """
-    An SPTree is a binary tree that partitions space at each level along a single line.
+    A SPTree is a binary tree that partitions space at each level in a 2D plane along a single line.
     The left child contains all lines in front of the splitting line, while the right child contains all lines
     behind the splitting line.
     """
 
-    def __init__(self, lines, bounding_box: box) -> None:
+    def __init__(self, lines: List[Partitionable], bounding_box: box) -> None:
         self.root = SPTree._construct(lines, bounding_box)
         self.bounding_box = bounding_box
-        self.walls_built = False
 
     @staticmethod
-    def _construct(lines: List[LineString], bounding_box: box) -> Optional[Node]:
+    def _construct(lines: List[Partitionable], bounding_box: box) -> Optional[Node]:
         """
         Create a SPTree from the given lines by subdividing the space in half using planes.
 
@@ -45,6 +44,7 @@ class SPTree:
 
         # Extend splitting line to intersect with the bounding box
         splitting_plane = _get_splitting_plane(splitting_line, bounding_box)
+        splitting_base = splitting_plane.get_base()
 
         # Classify all lines as being behind or in front of the splitting line
         # Lines that are intersected by the splitting plane will be split in half, with halves individually classified
@@ -53,20 +53,19 @@ class SPTree:
             if lines[i] == splitting_line:
                 continue
             line = lines[i]
-            line_start = Point(line.coords[0])
-            line_end = Point(line.coords[1])
+            base = line.get_base()
+            line_start = Point(base.coords[0])
+            line_end = Point(base.coords[1])
             # Coincident line to splitting plane
             # Distance is checked rather than using contains() because of floating point issues
-            if splitting_plane.distance(line_start) < error and splitting_plane.distance(line_end) < error:
+            if splitting_base.distance(line_start) < error and splitting_base.distance(line_end) < error:
                 coincident_lines.append(line)
             # Splitting plane crosses line
             # Split line in half and classify both halves accordingly
-            elif splitting_plane.crosses(line):
-                first_half, second_half = split(line, splitting_plane)
-                first_line = LineString(first_half.coords)
-                second_line = LineString(second_half.coords)
-                SPTree._categorize_line(first_line, splitting_line, front, back)
-                SPTree._categorize_line(second_line, splitting_line, front, back)
+            elif splitting_base.crosses(line.get_base()):
+                first_half, second_half = line.split(splitting_plane)
+                SPTree._categorize_line(first_half, splitting_line, front, back)
+                SPTree._categorize_line(second_half, splitting_line, front, back)
             # Line entirely enclosed within one side of the splitting plane
             else:
                 SPTree._categorize_line(line, splitting_line, front, back)
@@ -79,7 +78,7 @@ class SPTree:
         return cur_node
 
     @staticmethod
-    def _pick_splitting_line(lines: List[LineString], bounding_box: box) -> LineString:
+    def _pick_splitting_line(lines: List[Partitionable], bounding_box: box) -> Partitionable:
         """
         Randomly selects a sampling of lines and returns the one resulting in the least number of lines split
         from its splitting plane.
@@ -94,18 +93,19 @@ class SPTree:
         for i in range(len(line_sample)):
             num_pieces = 0
             splitting_plane = _get_splitting_plane(line_sample[i], bounding_box)
+            splitting_base = splitting_plane.get_base()
             for j in range(len(line_sample)):
                 # Skip the splitting line because it won't create any pieces with itself
                 if j == i:
                     continue
-                line = lines[j]
+                line = lines[j].get_base()
                 line_start = Point(line.coords[0])
                 line_end = Point(line.coords[1])
                 # Coincident line to splitting plane: no resulting pieces
-                if splitting_plane.distance(line_start) < error and splitting_plane.distance(line_end) < error:
+                if splitting_base.distance(line_start) < error and splitting_base.distance(line_end) < error:
                     continue
                 # Splitting plane crosses line: cuts line in half resulting in two disjoint pieces
-                elif splitting_plane.crosses(line):
+                elif splitting_base.crosses(line):
                     num_pieces += 2
                 # Line enclosed within one side of the splitting plane: one piece
                 else:
@@ -116,8 +116,8 @@ class SPTree:
         return line_sample[min_pieces_index]
 
     @staticmethod
-    def _categorize_line(line: LineString, splitting_line: LineString,
-                         front: List[LineString], behind: List[LineString]) -> None:
+    def _categorize_line(line: Partitionable, splitting_line: Partitionable,
+                         front: List[Partitionable], behind: List[Partitionable]) -> None:
         """
         Adds line to front or behind depending on its position relative to splitting_line.
 
@@ -129,72 +129,55 @@ class SPTree:
         :param behind: lines behind the splitting line
         :return: None
         """
-        if _is_point_in_front_of_line(line.centroid, splitting_line):
+        if _is_point_in_front_of_line(line.get_base().centroid, splitting_line):
             front.append(line)
         else:
             behind.append(line)
 
-    def painters_alg(self, point: Point):
+    def painters_alg(self, point: Point) -> Generator[List[Partitionable], None, None]:
+        """
+        Applies painter's algorithm to the SPTree.
+        The SPTree is recursively travelled via the generator, starting from nodes in the background and working
+        towards nodes in the foreground.
+
+        :param point: camera location
+        :return: generator for Painter's Algorithm
+        """
         return SPTree._painters_alg(self.root, point, self.bounding_box)
 
     @staticmethod
-    def _painters_alg(cur_node: Node, point: Point, bounding_box: box) -> Generator[Node, None, None]:
+    def _painters_alg(cur_node: Node, point: Point, bounding_box: box) -> Generator[List[Partitionable], None, None]:
         if cur_node is None:
-            raise StopIteration
+            return
 
+        # Last node to draw
         elif cur_node.is_leaf():
-            yield cur_node
+            yield cur_node.lines
 
+        # Point is in front of cur_node, so paint nodes further away i.e. right subtree first, then this node,
+        # and finally points in front of this node i.e. left subtree
         elif Perspective.classify(point, cur_node.lines[0], bounding_box) == Perspective.FRONT:
             if cur_node.right is not None:
                 yield from SPTree._painters_alg(cur_node.right, point, bounding_box)
-            yield cur_node
+            yield cur_node.lines
             if cur_node.left is not None:
                 yield from SPTree._painters_alg(cur_node.left, point, bounding_box)
 
+        # Point is in behind cur_node, so paint nodes further away i.e. left subtree first, then this node,
+        # and finally points behind this node i.e. right subtree
         elif Perspective.classify(point, cur_node.lines[0], bounding_box) == Perspective.BACK:
             if cur_node.left is not None:
                 yield from SPTree._painters_alg(cur_node.left, point, bounding_box)
-            yield cur_node
+            yield cur_node.lines
             if cur_node.right is not None:
                 yield from SPTree._painters_alg(cur_node.right, point, bounding_box)
 
+        # Point is coincident to cur_node, so it isn't drawn
         else:
             if cur_node.left is not None:
                 yield from SPTree._painters_alg(cur_node.left, point, bounding_box)
             if cur_node.right is not None:
                 yield from SPTree._painters_alg(cur_node.right, point, bounding_box)
-
-    def build_walls(self, height: int, edge_color: Tuple[int, int, int], mesh_color: Tuple[int, int, int]) -> None:
-        """
-        Build the walls corresponding to each node of the SPTree.
-
-        :param height: height of a wall
-        :param edge_color: wall edge color
-        :param mesh_color: wall face color
-        :return: None
-        """
-        if not self.walls_built:
-            SPTree._build_walls(self.root, height, edge_color, mesh_color)
-        self.walls_built = True
-
-    @staticmethod
-    def _build_walls(node: Node, height: int, edge_color: Tuple[int, int, int],
-                     mesh_color: Tuple[int, int, int]) -> None:
-        """
-        Build the walls corresponding to each node starting at node.
-
-        :param node: node of SPTree
-        :param height: height of a wall
-        :param edge_color: wall edge color
-        :param mesh_color: wall face color
-        :return: None
-        """
-        # Create walls for all valid nodes
-        if node is not None:
-            node.wall = WallBuilder(node.lines[0], height, edge_color, mesh_color).build()
-            SPTree._build_walls(node.left, height, edge_color, mesh_color)
-            SPTree._build_walls(node.right, height, edge_color, mesh_color)
 
 
 class Perspective(Enum):
@@ -206,16 +189,16 @@ class Perspective(Enum):
     BACK = 3
 
     @staticmethod
-    def classify(point: Point, line: LineString, bounding_box: box) -> Perspective:
+    def classify(point: Point, line: Partitionable, bounding_box: box) -> Perspective:
         """
         Classifies the position of point relative to line.
 
         :param point: point being classified
         :param line: line being used as the point of reference
-        :param bounding_box:
+        :param bounding_box: bounding box containing this line
         :return: ON if point is on the line, FRONT if point is in front of the line, or BACK if point is behind the line
         """
-        if _get_splitting_plane(line, bounding_box).distance(point) < error:
+        if _get_splitting_plane(line, bounding_box).get_base().distance(point) < error:
             return Perspective.ON
         if _is_point_in_front_of_line(point, line):
             return Perspective.FRONT
@@ -223,7 +206,7 @@ class Perspective(Enum):
             return Perspective.BACK
 
 
-def _is_point_in_front_of_line(point: Point, line: LineString) -> bool:
+def _is_point_in_front_of_line(point: Point, line: Partitionable) -> bool:
     """
     Determines whether the point is in front or behind the line.
     Winding order for line start, line end, and normal is clockwise.
@@ -233,10 +216,10 @@ def _is_point_in_front_of_line(point: Point, line: LineString) -> bool:
     :param line: line being used as the point of reference
     :return: True if it's in front, False otherwise
     """
-    return not LinearRing([line.coords[0], line.coords[1], point]).is_ccw
+    return not LinearRing([*line.get_base().coords, point]).is_ccw
 
 
-def _get_splitting_plane(line: LineString, polygon: Polygon) -> LineString:
+def _get_splitting_plane(line: Partitionable, polygon: Polygon) -> LineWrapper:
     """
     Extends a line inside a polygon to split said polygon.
 
@@ -248,7 +231,7 @@ def _get_splitting_plane(line: LineString, polygon: Polygon) -> LineString:
     minx, miny, maxx, maxy = polygon.bounds
 
     bounding_box = box(minx, miny, maxx, maxy)
-    p1, p2 = line.boundary
+    p1, p2 = line.get_base().boundary
     if p1.x == p2.x:  # vertical line
         extended_line = LineString([(p1.x, miny), (p1.x, maxy)])
     elif p1.y == p2.y:  # horizontal line
@@ -275,4 +258,4 @@ def _get_splitting_plane(line: LineString, polygon: Polygon) -> LineString:
         points_sorted_by_distance = sorted(unique_points_on_boundary_lines, key=bounding_box.distance)
         extended_line = LineString(points_sorted_by_distance[:2])
 
-    return extended_line
+    return LineWrapper(extended_line)

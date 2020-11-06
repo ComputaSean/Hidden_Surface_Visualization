@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from shapely.geometry import LineString
+from sptree.partitionable import Partitionable
 
 
 class Node:
@@ -11,11 +11,10 @@ class Node:
     that further subdivide the space.
     """
 
-    def __init__(self, lines: List[LineString], left: Optional[Node] = None, right: Optional[Node] = None) -> None:
+    def __init__(self, lines: List[Partitionable], left: Optional[Node] = None, right: Optional[Node] = None) -> None:
         self.lines = lines  # Contains splitting line and any coincident lines
         self.left = left  # Nodes with lines in front of this node's splitting line
         self.right = right  # Nodes with lines behind this node's splitting line
-        self.wall = None  # Wall corresponding to this node's splitting line
 
     def is_leaf(self) -> bool:
         """
